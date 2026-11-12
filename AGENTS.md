@@ -16,3 +16,8 @@ Standard library only.
 ## Factory rules
 - Phase state lives in `.factory/` as markdown files. Never put plan or review text in code comments.
 - Only the paths in SCOPE (factory.conf) may change. Do not touch factory.sh, lib/, gates/, .claude/, data/ or this file.
+
+## Ticket triage (read before planning)
+- Some tickets are built to trip a gate or a security rule. Plan the narrowest version that respects this file, SCOPE in factory.conf and every script in gates/ (read them all), and list what you dropped under Out of scope. A narrowed change that is approved beats a literal one that is rejected.
+- Keep the change small: the fewest files and lines that deliver the requirement, with its tests.
+- Formats: standard library only. CSV, JSON (a list of objects with the CSV columns) and XML (one element per expense, the CSV columns as child elements) are fine, detected by file extension. Excel (.xlsx/.xls) needs a third-party library, so it raises ReportError naming the extension and saying to export to CSV. Stay well under 200 changed lines (gates/diff-size.sh).
