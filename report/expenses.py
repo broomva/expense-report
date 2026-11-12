@@ -38,6 +38,11 @@ def read_expenses(path: Path) -> list[Expense]:
         return [parse_row(row, n) for n, row in enumerate(csv.DictReader(f), start=2)]
 
 
+def filter_currency(expenses: list[Expense], code: str) -> list[Expense]:
+    wanted = code.strip().upper()
+    return [e for e in expenses if e.currency == wanted]
+
+
 def summary(expenses: list[Expense]) -> str:
     if not expenses:
         return "No expenses."
