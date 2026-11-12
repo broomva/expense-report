@@ -6,7 +6,8 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from report.expenses import Expense, ReportError, parse_row, read_expenses, summary
+from report.__main__ import currency_lines
+from report.expenses import Expense, ReportError, parse_row, read_expenses, summary, totals_by_currency
 
 ROW = {"date": "2026-10-03", "description": "Taxi", "amount": "12.50", "currency": "usd"}
 
@@ -34,6 +35,11 @@ class ParseRow(unittest.TestCase):
         with self.assertRaisesRegex(ReportError, "3-letter"):
             parse_row({**ROW, "currency": "dollars"}, 2)
 
+    def test_rejects_non_finite_amounts_and_names_the_line(self) -> None:
+        for value in ["NaN", "sNaN", "Infinity", "-Infinity"]:
+            with self.subTest(value=value), self.assertRaisesRegex(ReportError, "line 4"):
+                parse_row({**ROW, "amount": value}, 4)
+
 
 class ReadAndSummarise(unittest.TestCase):
     def test_reads_a_file(self) -> None:
@@ -52,6 +58,25 @@ class ReadAndSummarise(unittest.TestCase):
     def test_summary_of_nothing(self) -> None:
         self.assertEqual(summary([]), "No expenses.")
 
+    def test_totals_by_currency_sums_per_currency(self) -> None:
+        expenses = [
+            parse_row({**ROW, "amount": "10.50", "currency": "EUR"}, 2),
+            parse_row({**ROW, "amount": "2.25", "currency": "EUR"}, 3),
+            parse_row({**ROW, "amount": "3", "currency": "USD"}, 4),
+        ]
+        self.assertEqual(totals_by_currency(expenses), {"EUR": Decimal("12.75"), "USD": Decimal("3")})
+
+    def test_currency_lines_sort_by_code_and_use_two_decimals(self) -> None:
+        expenses = read_expenses(Path("data/sample.csv"))
+        self.assertEqual(currency_lines(expenses), ["EUR 141.90", "GBP 210.00", "USD 485.00"])
+
+    def test_currency_lines_round_half_up_to_the_cent(self) -> None:
+        expenses = [parse_row({**ROW, "amount": "1.005", "currency": "EUR"}, 2)]
+        self.assertEqual(currency_lines(expenses), ["EUR 1.01"])
+
+    def test_currency_lines_of_nothing_is_empty(self) -> None:
+        self.assertEqual(currency_lines([]), [])
+
 
 class Cli(unittest.TestCase):
     def run_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
@@ -61,6 +86,13 @@ class Cli(unittest.TestCase):
         out = self.run_cli("data/sample.csv")
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("expenses from", out.stdout)
+
+    def test_prints_the_currency_lines_after_the_summary(self) -> None:
+        out = self.run_cli("data/sample.csv")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        lines = out.stdout.splitlines()
+        self.assertEqual(lines[1:], ["EUR 141.90", "GBP 210.00", "USD 485.00"])
+        self.assertIn("expenses from", lines[0])
 
     def test_bad_file_exits_1(self) -> None:
         self.assertEqual(self.run_cli("missing.csv").returncode, 1)

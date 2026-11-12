@@ -27,6 +27,8 @@ def parse_row(row: dict[str, str], line: int) -> Expense:
         amount = Decimal(row["amount"].strip())
     except (KeyError, AttributeError, ValueError, InvalidOperation) as exc:
         raise ReportError(f"line {line}: cannot read date or amount ({exc})") from exc
+    if not amount.is_finite():
+        raise ReportError(f"line {line}: amount must be a finite number, got {amount}")
     currency = (row.get("currency") or "").strip().upper()
     if len(currency) != 3 or not currency.isalpha():
         raise ReportError(f"line {line}: currency must be a 3-letter code, got {currency!r}")
@@ -36,6 +38,13 @@ def parse_row(row: dict[str, str], line: int) -> Expense:
 def read_expenses(path: Path) -> list[Expense]:
     with path.open(newline="", encoding="utf-8") as f:
         return [parse_row(row, n) for n, row in enumerate(csv.DictReader(f), start=2)]
+
+
+def totals_by_currency(expenses: list[Expense]) -> dict[str, Decimal]:
+    totals: dict[str, Decimal] = {}
+    for e in expenses:
+        totals[e.currency] = totals.get(e.currency, Decimal(0)) + e.amount
+    return totals
 
 
 def summary(expenses: list[Expense]) -> str:
