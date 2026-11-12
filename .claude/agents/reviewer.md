@@ -20,3 +20,5 @@ The final line of `.factory/review.md` must be exactly one of these two, with no
 
 VERDICT: APPROVE
 VERDICT: REJECT
+
+Judge only this diff. A finding about code or factory files that this diff does not touch is never a reason to reject. If you cannot run a command, read the changed files instead and decide.
