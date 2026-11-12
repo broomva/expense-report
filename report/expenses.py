@@ -38,6 +38,13 @@ def read_expenses(path: Path) -> list[Expense]:
         return [parse_row(row, n) for n, row in enumerate(csv.DictReader(f), start=2)]
 
 
+def currency_totals(expenses: list[Expense]) -> list[tuple[str, Decimal]]:
+    totals: dict[str, Decimal] = {}
+    for e in expenses:
+        totals[e.currency] = totals.get(e.currency, Decimal("0")) + e.amount
+    return sorted(totals.items())
+
+
 def summary(expenses: list[Expense]) -> str:
     if not expenses:
         return "No expenses."

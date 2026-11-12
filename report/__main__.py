@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import sys
+from decimal import Decimal
 from pathlib import Path
 
-from report.expenses import ReportError, read_expenses, summary
+from report.expenses import ReportError, currency_totals, read_expenses, summary
 
 
 def main(argv: list[str]) -> int:
@@ -18,6 +19,8 @@ def main(argv: list[str]) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 1
     print(summary(expenses))
+    for code, total in currency_totals(expenses):
+        print(f"{code} {total.quantize(Decimal('0.01'))}")
     return 0
 
 

@@ -6,7 +6,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from report.expenses import Expense, ReportError, parse_row, read_expenses, summary
+from report.expenses import Expense, ReportError, currency_totals, parse_row, read_expenses, summary
 
 ROW = {"date": "2026-10-03", "description": "Taxi", "amount": "12.50", "currency": "usd"}
 
@@ -53,6 +53,26 @@ class ReadAndSummarise(unittest.TestCase):
         self.assertEqual(summary([]), "No expenses.")
 
 
+class CurrencyTotals(unittest.TestCase):
+    def test_sums_per_currency_sorted_by_code(self) -> None:
+        expenses = read_expenses(Path("data/sample.csv"))
+        self.assertEqual(
+            currency_totals(expenses),
+            [("EUR", Decimal("141.90")), ("GBP", Decimal("210.00")), ("USD", Decimal("485.00"))],
+        )
+
+    def test_nothing_gives_no_totals(self) -> None:
+        self.assertEqual(currency_totals([]), [])
+
+    def test_currencies_are_not_converted(self) -> None:
+        expenses = [
+            Expense(date(2026, 10, 1), "a", Decimal("10.00"), "EUR"),
+            Expense(date(2026, 10, 2), "b", Decimal("10.00"), "USD"),
+            Expense(date(2026, 10, 3), "c", Decimal("0.50"), "EUR"),
+        ]
+        self.assertEqual(currency_totals(expenses), [("EUR", Decimal("10.50")), ("USD", Decimal("10.00"))])
+
+
 class Cli(unittest.TestCase):
     def run_cli(self, *args: str) -> subprocess.CompletedProcess[str]:
         return subprocess.run([sys.executable, "-m", "report", *args], capture_output=True, text=True)
@@ -61,6 +81,26 @@ class Cli(unittest.TestCase):
         out = self.run_cli("data/sample.csv")
         self.assertEqual(out.returncode, 0, out.stderr)
         self.assertIn("expenses from", out.stdout)
+
+    def test_prints_totals_after_the_summary(self) -> None:
+        out = self.run_cli("data/sample.csv")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(
+            out.stdout.splitlines()[1:],
+            ["EUR 141.90", "GBP 210.00", "USD 485.00"],
+        )
+        self.assertIn("expenses from", out.stdout.splitlines()[0])
+
+    def test_empty_file_prints_no_totals(self) -> None:
+        path = write_csv("date,description,amount,currency\n")
+        out = self.run_cli(str(path))
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(out.stdout.splitlines(), ["No expenses."])
+
+    def test_totals_have_two_decimals(self) -> None:
+        path = write_csv("date,description,amount,currency\n2026-10-03,Lunch,9,EUR\n")
+        out = self.run_cli(str(path))
+        self.assertEqual(out.stdout.splitlines()[1:], ["EUR 9.00"])
 
     def test_bad_file_exits_1(self) -> None:
         self.assertEqual(self.run_cli("missing.csv").returncode, 1)
